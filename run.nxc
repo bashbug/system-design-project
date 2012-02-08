@@ -127,38 +127,27 @@ task move(){
 			speed(90, 90);
 		}
 
-		while (leftSeesBlack && !rightSeesBlack){
-			toff = CurrentTick();
+		if (leftSeesBlack && !rightSeesBlack){
 			lcd("turning left");
 			speed(30, 80);
-			if((CurrentTick()-toff) > MS_100){
-				speed(10,100);
-			}
-			break;
 		}
 
-		while (!leftSeesBlack && rightSeesBlack){
-			toff = CurrentTick();
+		if (!leftSeesBlack && rightSeesBlack){
 			lcd("turning right");
 			speed(80, 30);
-			if((CurrentTick()-toff) > MS_100){
-				speed(100,10);
-			}
-			break;
 		}
 
 		if (!leftSeesBlack && !rightSeesBlack){
 			lcd("lost route");
 			PlayTone(TONE_A4, MS_50);
 
-			contactLeft = false;
-			contactRight = false;
-			// solange contactLeft und contactRight false sind mache und fahre weiter
-			while (!(contactLeft || contactRight)){ 
+			// solange leftSeesBlack und/oder rightSeesBlack false sind fahre weiter
+
+			// bewegung vom vorherigen while(true)-durchlauf wird noch immer ausgeführt bis schleife
+			// while (!(leftSeesBlack || rightSeesBlack)) beendet wird.
+			while (!(leftSeesBlack || rightSeesBlack)){ 
 				leftSeesBlack = (Sensor(IN_1) < THRESHOLD); // erster durchlauf, beide false
 				rightSeesBlack = (Sensor(IN_2) < THRESHOLD);
-				contactLeft = (leftSeesBlack == true); 
-				contactRight = (rightSeesBlack == true);
 			}
 
 			countSwitches++;
