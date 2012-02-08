@@ -1,0 +1,176 @@
+#define THRESHOLD 45 //(dark 0 - 100 light)
+
+bool leftSeesBlack = 0;
+bool leftLastState = 0;
+bool rightSeesBlack = 0;
+bool rightLastState = 0;
+bool contactLeft = 0;
+bool contactRight = 0;
+int countSwitches = 0;
+int countTower = 0;
+long t0, t_bar;
+
+void speed(int speedLeft, int speedRight){ //OUT_A=left Motor; OUT_B=right Motor
+	if(speedLeft > 0){
+		OnRev(OUT_A, speedLeft);
+	} else {
+		OnFwd(OUT_A, - speedLeft);
+	}
+	if(speedRight > 0){
+		OnRev(OUT_B, speedRight);
+	} else {
+		OnFwd(OUT_B, - speedRight);
+	}
+}
+
+void lcd(string s){ 
+	ClearScreen();
+	TextOut(5, LCD_LINE1, s);
+}
+
+void back_to_line(){
+	if(countTower==1 || countTower ==3){
+		speed(-40, -40);
+		Wait(150);
+		speed(-40, 60);
+		lcd("back on line");
+		until ((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2) < THRESHOLD));
+		lcd("found line :-)");		
+	}
+	if(countTower == 2){
+		speed(-40, -40);
+		Wait(150);
+		speed(60, -40);
+		lcd("back on line");
+		until ((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2) < THRESHOLD));
+		lcd("found line :-)");	
+	}
+}
+
+void tower() {
+	if(countTower == 1){
+		lcd("search 1. Tower right");
+		while(SensorUS(IN_4) >= 30){ 
+			speed(50,-40);
+			until(SensorUS(IN_4) < 30)
+		}
+		lcd("moving to 1. Tower");
+		speed(60,60);
+		while(Sensor(IN_3) == 0){
+			speed(60,60);
+			until(Sensor(IN_3) == 1);
+			lcd("got it!");
+			speed(10,10);
+			Wait(500);
+		}
+		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
+			back_to_line();
+		}
+	}
+
+	if(countTower == 2){
+		lcd("search 2. Tower left");
+		while(SensorUS(IN_4) >= 30){ 
+			speed(-40, 50);
+			until(SensorUS(IN_4) < 30)
+		}
+		lcd("moving to 2. Tower");
+		speed(60,60);
+		while(Sensor(IN_3) == 0){
+			speed(60,60);
+			until(Sensor(IN_3) == 1);
+			lcd("got it!");
+			speed(10,10);
+			Wait(500);
+		}
+		lcd("back to line");
+		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
+			back_to_line();
+		}
+	}
+
+	if(countTower == 3){
+		lcd("search 3. Tower right");
+		while(SensorUS(IN_4) >= 30){ 
+			speed(50,-40);
+			until(SensorUS(IN_4) < 30)
+		}
+		lcd("moving to 3. Tower");
+		speed(60,60);
+		while(Sensor(IN_3) == 0){
+			speed(60,60);
+			until(Sensor(IN_3) == 1);
+			lcd("got it!");
+			speed(10,10);
+			Wait(500);
+		}
+		lcd("back to line");
+		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
+			back_to_line();
+		}
+	}
+}
+
+task move(){
+	while(true){
+		rightLastState = rightSeesBlack;
+		leftLastState = leftSeesBlack;
+		rightSeesBlack = Sensor(IN_2) < THRESHOLD;
+		leftSeesBlack = Sensor(IN_1) < THRESHOLD;
+
+		if (leftSeesBlack && rightSeesBlack){
+			lcd("straight");
+			speed(80, 80);
+		}
+
+		if (leftSeesBlack && !rightSeesBlack){
+			lcd("turning left");
+			speed(20, 60);
+		}
+
+		if (!leftSeesBlack && rightSeesBlack){
+			lcd("turning right");
+			speed(60, 20);
+		}
+
+		if (!leftSeesBlack && !rightSeesBlack){
+			lcd("lost route");
+			PlayTone(TONE_A4, MS_50);
+
+			contactLeft = false;
+			contactRight = false;
+			// solange contactLeft und contactRight false sind mache
+			while (!(contactLeft || contactRight)){
+				rightSeesBlack = (Sensor(IN_2) < THRESHOLD);
+				leftSeesBlack = (Sensor(IN_1) < THRESHOLD);
+				contactLeft = (leftSeesBlack == true);
+				contactRight = (rightSeesBlack == true);
+			}
+
+			countSwitches++;
+			if ((CurrentTick()-t0) > MS_500){
+				t0 = CurrentTick();
+				countSwitches = 0;
+			}
+
+			if (countSwitches >= 1 && ((CurrentTick()-t0) < MS_500)){
+				PlayTone(TONE_C4, MS_500);
+				t0 = CurrentTick();
+				countSwitches = 0;
+				countTower++;
+				speed(60,60); // das klappt hier noch nicht
+				Wait(200);  // das klappt hier noch nicht
+				tower();
+			}
+		}
+	}
+}
+
+task main(){
+	//initialize sensors
+	SetSensorLight(IN_1); // left Light-Sensor
+	SetSensorLight(IN_2); // right Light-Sensor
+	SetSensorTouch(IN_3); // touch-Sensor
+	SetSensorLowspeed(IN_4); // ultrasonic-Sensor
+	start move;
+}
