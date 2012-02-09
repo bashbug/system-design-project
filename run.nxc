@@ -6,7 +6,7 @@ bool contactLeft = 0;
 bool contactRight = 0;
 int countSwitches = 0;
 int countTower = 0;
-long t0, tlost, trotate, toff;
+long t0, ttowerfail, trotate, toff;
 
 void speed(int speedLeft, int speedRight){ //OUT_A=left Motor; OUT_B=right Motor
 	if(speedLeft > 0){
@@ -47,6 +47,7 @@ void back_to_line(){
 
 void tower() {
 	Wait(MS_400);
+	ttowerfail = CurrentTick();
 	if(countTower == 1){
 		lcd("search 1. Tower right");
 		while(SensorUS(IN_4) >= 30){ 
@@ -55,9 +56,11 @@ void tower() {
 			Wait(MS_100);
 		}
 		lcd("moving to 1. Tower");
-		speed(60,60);
 		while(Sensor(IN_3) == 0){
 			speed(60,60);
+			if((CurrentTick()-ttowerfail) > MS_800) { // falls am tower vorbei gefahren wird o.ae.
+				back_to_line();
+			}
 			until(Sensor(IN_3) == 1);
 			lcd("got it!");
 		}
@@ -74,9 +77,11 @@ void tower() {
 			Wait(MS_100);
 		}
 		lcd("moving to 2. Tower");
-		speed(60,60);
 		while(Sensor(IN_3) == 0){
 			speed(60,60);
+			if((CurrentTick()-ttowerfail) > MS_800) { // falls am tower vorbei gefahren wird o.ae.
+				back_to_line();
+			}
 			until(Sensor(IN_3) == 1);
 			lcd("got it!");
 		}
@@ -93,9 +98,11 @@ void tower() {
 			Wait(MS_100);
 		}
 		lcd("moving to 3. Tower");
-		speed(60,60);
 		while(Sensor(IN_3) == 0){
 			speed(60,60);
+			if((CurrentTick()-ttowerfail) > MS_800) { // falls am tower vorbei gefahren wird o.ae.
+				back_to_line();
+			}
 			until(Sensor(IN_3) == 1);
 			lcd("got it!");
 		}
@@ -135,6 +142,9 @@ task move(){
 			while (!(leftSeesBlack || rightSeesBlack)){
 				leftSeesBlack = (Sensor(IN_1) < THRESHOLD);
 				rightSeesBlack = (Sensor(IN_2) < THRESHOLD);
+				//wenn 90grad Kurve, dann wird nach rechts eingedreht, wenn in einer bestimmten Zeit
+				//nicht schwarz sieht, dann wird in andere Richtung eingedreht bis einer von beiden
+				//sensoren schwarz sieht.
 				if(!(leftSeesBlack && rightSeesBlack) && (CurrentTick()-toff) > MS_500) {
 					speed(-40,-40);
 					Wait(MS_200);
