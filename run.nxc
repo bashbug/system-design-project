@@ -6,7 +6,7 @@ bool contactLeft = 0;
 bool contactRight = 0;
 int countSwitches = 0;
 int countTower = 0;
-long t0, tlost, tlost_count, toff;
+long t0, tlost, trotate, toff;
 
 void speed(int speedLeft, int speedRight){ //OUT_A=left Motor; OUT_B=right Motor
 	if(speedLeft > 0){
@@ -46,12 +46,13 @@ void back_to_line(){
 }
 
 void tower() {
-	Wait(MS_500);
+	Wait(MS_400);
 	if(countTower == 1){
 		lcd("search 1. Tower right");
 		while(SensorUS(IN_4) >= 30){ 
 			speed(50,-40);
-			until(SensorUS(IN_4) < 30)
+			until(SensorUS(IN_4) < 30);
+			Wait(MS_100);
 		}
 		lcd("moving to 1. Tower");
 		speed(60,60);
@@ -59,8 +60,6 @@ void tower() {
 			speed(60,60);
 			until(Sensor(IN_3) == 1);
 			lcd("got it!");
-			// speed(10,10);
-			// Wait(500);
 		}
 		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
 			back_to_line();
@@ -71,7 +70,8 @@ void tower() {
 		lcd("search 2. Tower left");
 		while(SensorUS(IN_4) >= 30){ 
 			speed(-40, 50);
-			until(SensorUS(IN_4) < 30)
+			until(SensorUS(IN_4) < 30);
+			Wait(MS_100);
 		}
 		lcd("moving to 2. Tower");
 		speed(60,60);
@@ -79,8 +79,6 @@ void tower() {
 			speed(60,60);
 			until(Sensor(IN_3) == 1);
 			lcd("got it!");
-			speed(10,10);
-			Wait(500);
 		}
 		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
 			back_to_line();
@@ -91,7 +89,8 @@ void tower() {
 		lcd("search 3. Tower right");
 		while(SensorUS(IN_4) >= 30){ 
 			speed(50,-40);
-			until(SensorUS(IN_4) < 30)
+			until(SensorUS(IN_4) < 30);
+			Wait(MS_100);
 		}
 		lcd("moving to 3. Tower");
 		speed(60,60);
@@ -99,8 +98,6 @@ void tower() {
 			speed(60,60);
 			until(Sensor(IN_3) == 1);
 			lcd("got it!");
-			speed(10,10);
-			Wait(500);
 		}
 		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
 			back_to_line();
@@ -131,12 +128,24 @@ task move(){
 		if (!leftSeesBlack && !rightSeesBlack){
 			lcd("lost route");
 			PlayTone(TONE_A4, MS_50);
+			toff = CurrentTick();
 			// solange leftSeesBlack und/oder rightSeesBlack false sind fahre weiter
 			// bewegung vom vorherigen while(true)-durchlauf wird noch immer ausgeführt bis schleife
 			// while (!(leftSeesBlack || rightSeesBlack)) beendet wird.
-			while (!(leftSeesBlack || rightSeesBlack)){ 
+			while (!(leftSeesBlack || rightSeesBlack)){
 				leftSeesBlack = (Sensor(IN_1) < THRESHOLD);
 				rightSeesBlack = (Sensor(IN_2) < THRESHOLD);
+				if(!(leftSeesBlack && rightSeesBlack) && (CurrentTick()-toff) > MS_500) {
+					speed(-40,-40);
+					Wait(MS_200);
+					speed(10,-60);
+					trotate = CurrentTick();
+					until(((CurrentTick()-trotate) < MS_500) || ((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2)< THRESHOLD)));
+					if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)) {
+						speed(-60,10);
+						until((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2)< THRESHOLD));
+					}
+				}
 			}
 			//hier wird wieder schwarz gesehen
 			//leftSeesBlack oder rightSeesBlack/beide sehen schwarz
@@ -147,7 +156,7 @@ task move(){
 				t0 = CurrentTick();
 				countSwitches = 0;
 			}
-			if (countSwitches = 1 && ((CurrentTick()-t0) < MS_200)){ 
+			if (countSwitches == 1 && ((CurrentTick()-t0) < MS_200)){ 
 				//wenn er nach schwarz sehen, innerhalb von ca. 200ms wieder schwarz sieht,
 				//dann erkennt er den barcode. bedeutet, dass er den barcode aber nur anhand
 				//eines weissen striches fest macht.
