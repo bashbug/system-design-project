@@ -49,10 +49,10 @@ void backToLine() {
 
 	switch (countTower) {
 		case 1:
-		case 2:
+		case 3:
 			speed(-60, 60);
 			break;
-		case 3:
+		case 2:
 			speed(60, -60);
 			break;
 	}
@@ -71,10 +71,10 @@ void tower() {
 
 	switch (countTower) {
 		case 1:
-		case 2:
+		case 3:
 			speed(30,-30);
 			break;
-		case 3:
+		case 2:
 			speed(30,-30);
 			break;
 	}
