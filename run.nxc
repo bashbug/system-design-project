@@ -5,8 +5,8 @@ bool rightLastBlack;
 bool leftLastBlack;
 int countBWChanges = 0;
 int countTower = 0;
-long seesWhiteTime, ttowerfail;
-long lastWhiteSeen = 0;
+long towerfail;
+long lastBWChange = 0;
 
 void calibrateLightSensors() {
 	TextOut(0, LCD_LINE1, "Kalibrieren?");
@@ -17,11 +17,8 @@ void calibrateLightSensors() {
 	int s1 = Sensor(IN_1);
 	int s2 = Sensor(IN_2);
 
-	if (s1 > s2) {
-		thresholdBlack = s1 - 10;
-	} else {
-		thresholdBlack = s2 - 10;
-	}
+	thresholdBlack = (s1+s2)/2;
+
 	TextOut(0, LCD_LINE3, "Threshold: ");
 	NumOut(60, LCD_LINE3, thresholdBlack);
 	TextOut(0, LCD_LINE4, "Weiter in 2 Sek");
@@ -119,10 +116,10 @@ task move() {
 				speed(-30, -35);
 			} else if (leftLastBlack) {
 				lcd("Turning left");
-				speed(-10, 70);
+				speed(-10, 80);
 			} else if (rightLastBlack) {
 				lcd("Turning right");
-				speed(70, -10);
+				speed(80, -10);
 			}
 
 			/* 
@@ -130,7 +127,11 @@ task move() {
 			 * bewegung vom vorherigen until (true)-durchlauf wird noch immer ausgeführt bis schleife
 			 * until ((leftSeesBlack || rightSeesBlack)) beendet wird.
 			 */
+			long curveStart = CurrentTick();
 			until (leftSeesBlack || rightSeesBlack) {
+				// if ((curveStart+SEC_1) < CurrentTick() {
+				// 	rightLastBlack
+				// }
 				leftSeesBlack = (Sensor(IN_1) < thresholdBlack);
 				rightSeesBlack = (Sensor(IN_2) < thresholdBlack);
 			}
@@ -138,31 +139,22 @@ task move() {
 			 * hier wird wieder schwarz gesehen
 			 * leftSeesBlack oder rightSeesBlack/beide sehen schwarz
 			 */
-			seesWhiteTime = CurrentTick();
 			int barTimeLength = MS_200;
 			countBWChanges++;
-			if ((CurrentTick()-seesWhiteTime) > barTimeLength) {
-				NumOut(0,LCD_LINE4, seesWhiteTime);
-				/* 
-				 * wenn zu lange weiss war bis er schwarz gesehen hat
-				 * dann wird zurückgesetzt
-				 */
-				countBWChanges = 0;
-			}
-			if ((CurrentTick()-lastWhiteSeen) < MS_200 && countBWChanges == 2 && ((CurrentTick()-seesWhiteTime) < barTimeLength)) { 
+			if ((CurrentTick()-lastBWChange) < barTimeLength && countBWChanges >= 2) { 
 				/* 
 				 * wenn er nach schwarz sehen, innerhalb von ca. 200ms wieder schwarz sieht,
 				 * dann erkennt er den barcode. bedeutet, dass er den barcode aber nur anhand
 				 * eines weissen striches fest macht.
 				 */
 				PlayTone(TONE_C4, 200);
-				seesWhiteTime = CurrentTick();
-				lastWhiteSeen = 0;
 				countBWChanges = 0;
 				countTower++;
-				tower();
+				if(countTower <= 3) {
+					tower();
+				}
 			}
-			lastWhiteSeen += CurrentTick();
+			lastBWChange = CurrentTick();
 		}
 	}
 }
