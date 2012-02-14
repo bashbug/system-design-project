@@ -1,178 +1,161 @@
-#define THRESHOLD 45 //(dark 0 - 100 light)
-
+int thresholdBlack = 45; //(dark 0 - 100 light)
 bool leftSeesBlack = 0;
 bool rightSeesBlack = 0;
-bool contactLeft = 0;
-bool contactRight = 0;
-int countSwitches = 0;
+bool rightLastBlack;
+bool leftLastBlack;
+int countBWChanges = 0;
 int countTower = 0;
-long t0, ttowerfail, trotate, toff;
+long t0, ttowerfail;
 
-void speed(int speedLeft, int speedRight){ //OUT_A=left Motor; OUT_B=right Motor
-	if(speedLeft > 0){
-		OnRev(OUT_A, speedLeft);
-	} else {
-		OnFwd(OUT_A, - speedLeft);
+void calibrateLightSensors() {
+	TextOut(0, LCD_LINE1, "Kalibrieren?");
+	until (ButtonPressed(BTNCENTER, true)) {
+		Wait(MS_100);
 	}
-	if(speedRight > 0){
-		OnRev(OUT_B, speedRight);
+
+	int s1 = Sensor(IN_1);
+	int s2 = Sensor(IN_2);
+
+	if (s1 > s2) {
+		thresholdBlack = s1 - 10;
 	} else {
-		OnFwd(OUT_B, - speedRight);
+		thresholdBlack = s2 - 10;
 	}
+	TextOut(0, LCD_LINE3, "Threshold: ");
+	NumOut(60, LCD_LINE3, thresholdBlack);
+	TextOut(0, LCD_LINE4, "Weiter in 2 Sek");
+	Wait(SEC_2);
 }
 
-void lcd(string s){ 
+
+void speed(int speedLeft, int speedRight) { // OUT_A=left Motor; OUT_B=right Motor
+	if (speedLeft == speedRight) {
+		OnRevSync(OUT_AB, speedLeft, 0);
+	}
+	OnRev(OUT_A, speedLeft);
+	OnRev(OUT_B, speedRight);
+}
+
+void lcd(string s) { 
 	ClearScreen();
 	TextOut(5, LCD_LINE1, s);
 }
 
-void back_to_line(){
-	if(countTower==1 || countTower ==3){
-		speed(-50, -50);
-		Wait(MS_200);
-		speed(-40, 60);
-		lcd("back on line");
-		until ((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2) < THRESHOLD));
-		lcd("found line :-)");		
+void backToLine() {
+	// erstmal ein Stück rückwärts fahren
+	lcd("Back to line");
+	speed(-60, -60);
+	Wait(MS_500);
+
+	switch (countTower) {
+		case 1:
+		case 2:
+			speed(-60, 60);
+			break;
+		case 3:
+			speed(60, -60);
+			break;
 	}
-	if(countTower == 2){
-		speed(-50, -50);
-		Wait(MS_200);
-		speed(60, -40);
-		lcd("back on line");
-		until ((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2) < THRESHOLD));
-		lcd("found line :-)");	
-	}
+	until ((Sensor(IN_1) < thresholdBlack) || (Sensor(IN_2) < thresholdBlack));
+	lcd("Found line :-)");
+	// Sollte eigentlich überflüssig sein
+	speed(30, 30);	
 }
 
 void tower() {
-	Wait(MS_400);
+	TextOut(0, LCD_LINE1, "Search Tower:");
+	NumOut(70, LCD_LINE1, countTower);
+	// etwas weiter fahren, damit man besser eindrehen kann
+	speed(40,40);
+	Wait(MS_200);
+
+	switch (countTower) {
+		case 1:
+		case 2:
+			speed(30,-30);
+			break;
+		case 3:
+			speed(30,-30);
+			break;
+	}
+
+	until (SensorUS(IN_4) < 30) {
+		PlayTone(TONE_A4, MS_1);
+	}
+	PlayTone(TONE_C4, MS_100);
+	// MS_200 länger eindrehen
+	Wait(MS_200);
+
 	ttowerfail = CurrentTick();
-	if(countTower == 1){
-		lcd("search 1. Tower right");
-		while(SensorUS(IN_4) >= 30){ 
-			speed(50,-40);
-			until(SensorUS(IN_4) < 30);
-			Wait(MS_100);
-		}
-		lcd("moving to 1. Tower");
-		while(Sensor(IN_3) == 0){
-			speed(60,60);
-			if((CurrentTick()-ttowerfail) > MS_800) { // falls am tower vorbei gefahren wird o.ae.
-				back_to_line();
-			}
-			until(Sensor(IN_3) == 1);
-			lcd("got it!");
-		}
-		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
-			back_to_line();
-		}
-	}
+	TextOut(0, LCD_LINE3, "Moving to tower");
+	speed(30, 30);
 
-	if(countTower == 2){
-		lcd("search 2. Tower left");
-		while(SensorUS(IN_4) >= 30){ 
-			speed(-40, 50);
-			until(SensorUS(IN_4) < 30);
-			Wait(MS_100);
-		}
-		lcd("moving to 2. Tower");
-		while(Sensor(IN_3) == 0){
-			speed(60,60);
-			if((CurrentTick()-ttowerfail) > MS_800) { // falls am tower vorbei gefahren wird o.ae.
-				back_to_line();
-			}
-			until(Sensor(IN_3) == 1);
-			lcd("got it!");
-		}
-		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
-			back_to_line();
-		}
-	}
-
-	if(countTower == 3){
-		lcd("search 3. Tower right");
-		while(SensorUS(IN_4) >= 30){ 
-			speed(50,-40);
-			until(SensorUS(IN_4) < 30);
-			Wait(MS_100);
-		}
-		lcd("moving to 3. Tower");
-		while(Sensor(IN_3) == 0){
-			speed(60,60);
-			if((CurrentTick()-ttowerfail) > MS_800) { // falls am tower vorbei gefahren wird o.ae.
-				back_to_line();
-			}
-			until(Sensor(IN_3) == 1);
-			lcd("got it!");
-		}
-		if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)){
-			back_to_line();
-		}
-	}
+	until (Sensor(IN_3));
+	Off(OUT_AB);
+	TextOut(0, LCD_LINE4, "Got it!");
+	PlayTone(TONE_A4, MS_100);
+	backToLine();
 }
 
-task move(){
-	while(true){
-		rightSeesBlack = Sensor(IN_2) < THRESHOLD;
-		leftSeesBlack = Sensor(IN_1) < THRESHOLD;
+task move() {
+	while (true) {
+		rightLastBlack = rightSeesBlack;
+		leftLastBlack = leftSeesBlack;
+		rightSeesBlack = Sensor(IN_2) < thresholdBlack;
+		leftSeesBlack = Sensor(IN_1) < thresholdBlack;
 
-		if (leftSeesBlack && rightSeesBlack){
-			lcd("straight");
-			speed(90, 90);
+		if (leftSeesBlack || rightSeesBlack) {
+			lcd("Straight");
+			speed(80, 80);
 		}
 
-		if (leftSeesBlack && !rightSeesBlack){
-			lcd("turning left");
-			speed(30, 80);
-		}
-
-		if (!leftSeesBlack && rightSeesBlack){
-			lcd("turning right");
-			speed(80, 30);
-		}
-
-		if (!leftSeesBlack && !rightSeesBlack){
-			lcd("lost route");
+		if (!leftSeesBlack && !rightSeesBlack) {
+			lcd("Lost route");
 			PlayTone(TONE_A4, MS_50);
-			toff = CurrentTick();
-			// solange leftSeesBlack und/oder rightSeesBlack false sind fahre weiter
-			// bewegung vom vorherigen while(true)-durchlauf wird noch immer ausgeführt bis schleife
-			// while (!(leftSeesBlack || rightSeesBlack)) beendet wird.
-			while (!(leftSeesBlack || rightSeesBlack)){
-				leftSeesBlack = (Sensor(IN_1) < THRESHOLD);
-				rightSeesBlack = (Sensor(IN_2) < THRESHOLD);
-				//wenn 90grad Kurve, dann wird nach rechts eingedreht, wenn in einer bestimmten Zeit
-				//nicht schwarz sieht, dann wird in andere Richtung eingedreht bis einer von beiden
-				//sensoren schwarz sieht.
-				if(!(leftSeesBlack && rightSeesBlack) && (CurrentTick()-toff) > MS_500) {
-					speed(-40,-40);
-					Wait(MS_200);
-					speed(10,-60);
-					trotate = CurrentTick();
-					until(((CurrentTick()-trotate) < MS_500) || ((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2)< THRESHOLD)));
-					if((Sensor(IN_1) > THRESHOLD) && (Sensor(IN_2) > THRESHOLD)) {
-						speed(-60,10);
-						until((Sensor(IN_1) < THRESHOLD) || (Sensor(IN_2)< THRESHOLD));
-					}
-				}
+
+			if (leftLastBlack && rightLastBlack) {
+				lcd("Turning back");
+				speed(-30, -35);
+			} else if (leftLastBlack) {
+				lcd("Turning left");
+				speed(-10, 70);
+			} else if (rightLastBlack) {
+				lcd("Turning right");
+				speed(70, -10);
 			}
-			//hier wird wieder schwarz gesehen
-			//leftSeesBlack oder rightSeesBlack/beide sehen schwarz
-			countSwitches++;
-			if ((CurrentTick()-t0) > MS_200){ 
-				//wenn zu lange weiss war bis er schwarz gesehen hat
-				//dann wird zurückgesetzt
+
+			/* 
+			 * solange leftSeesBlack und/oder rightSeesBlack false sind fahre weiter
+			 * bewegung vom vorherigen until (true)-durchlauf wird noch immer ausgeführt bis schleife
+			 * until (!(leftSeesBlack || rightSeesBlack)) beendet wird.
+			 */
+			until (leftSeesBlack || rightSeesBlack) {
+				leftSeesBlack = (Sensor(IN_1) < thresholdBlack);
+				rightSeesBlack = (Sensor(IN_2) < thresholdBlack);
+			}
+			/* 
+			 * hier wird wieder schwarz gesehen
+			 * leftSeesBlack oder rightSeesBlack/beide sehen schwarz
+			 */
+			int barTimeLength = MS_200;
+			countBWChanges++;
+			if ((CurrentTick()-t0) > barTimeLength) { 
+				/* 
+				 * wenn zu lange weiss war bis er schwarz gesehen hat
+				 * dann wird zurückgesetzt
+				 */
 				t0 = CurrentTick();
-				countSwitches = 0;
+				countBWChanges = 0;
 			}
-			if (countSwitches == 1 && ((CurrentTick()-t0) < MS_200)){ 
-				//wenn er nach schwarz sehen, innerhalb von ca. 200ms wieder schwarz sieht,
-				//dann erkennt er den barcode. bedeutet, dass er den barcode aber nur anhand
-				//eines weissen striches fest macht.
+			if (countBWChanges == 1 && ((CurrentTick()-t0) < barTimeLength)) { 
+				/* 
+				 * wenn er nach schwarz sehen, innerhalb von ca. 200ms wieder schwarz sieht,
+				 * dann erkennt er den barcode. bedeutet, dass er den barcode aber nur anhand
+				 * eines weissen striches fest macht.
+				 */
 				PlayTone(TONE_C4, 200);
 				t0 = CurrentTick();
-				countSwitches = 0;
+				countBWChanges = 0;
 				countTower++;
 				tower();
 			}
@@ -180,11 +163,12 @@ task move(){
 	}
 }
 
-task main(){
+task main() {
 	//initialize sensors
-	SetSensorLight(IN_1); // left Light-Sensor
-	SetSensorLight(IN_2); // right Light-Sensor
-	SetSensorTouch(IN_3); // touch-Sensor
-	SetSensorLowspeed(IN_4); // ultrasonic-Sensor
+	SetSensorLight(IN_1); 		// left Light-Sensor
+	SetSensorLight(IN_2); 		// right Light-Sensor
+	SetSensorTouch(IN_3); 		// touch-Sensor
+	SetSensorLowspeed(IN_4); 	// ultrasonic-Sensor
+	calibrateLightSensors();
 	start move;
 }
