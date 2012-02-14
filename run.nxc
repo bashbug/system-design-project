@@ -5,7 +5,8 @@ bool rightLastBlack;
 bool leftLastBlack;
 int countBWChanges = 0;
 int countTower = 0;
-long t0, ttowerfail;
+long seesWhiteTime, ttowerfail;
+long lastWhiteSeen = 0;
 
 void calibrateLightSensors() {
 	TextOut(0, LCD_LINE1, "Kalibrieren?");
@@ -69,13 +70,13 @@ void tower() {
 	speed(40,40);
 	Wait(MS_200);
 
-	switch (countTower) {
-		case 1:
+	switch (countTower) { 
+		case 1:				//erster und dritter ist rechts
 		case 3:
 			speed(30,-30);
 			break;
 		case 2:
-			speed(30,-30);
+			speed(-30,30);
 			break;
 	}
 
@@ -106,7 +107,7 @@ task move() {
 
 		if (leftSeesBlack || rightSeesBlack) {
 			lcd("Straight");
-			speed(80, 80);
+			speed(90, 90);
 		}
 
 		if (!leftSeesBlack && !rightSeesBlack) {
@@ -127,7 +128,7 @@ task move() {
 			/* 
 			 * solange leftSeesBlack und/oder rightSeesBlack false sind fahre weiter
 			 * bewegung vom vorherigen until (true)-durchlauf wird noch immer ausgeführt bis schleife
-			 * until (!(leftSeesBlack || rightSeesBlack)) beendet wird.
+			 * until ((leftSeesBlack || rightSeesBlack)) beendet wird.
 			 */
 			until (leftSeesBlack || rightSeesBlack) {
 				leftSeesBlack = (Sensor(IN_1) < thresholdBlack);
@@ -137,28 +138,31 @@ task move() {
 			 * hier wird wieder schwarz gesehen
 			 * leftSeesBlack oder rightSeesBlack/beide sehen schwarz
 			 */
+			seesWhiteTime = CurrentTick();
 			int barTimeLength = MS_200;
 			countBWChanges++;
-			if ((CurrentTick()-t0) > barTimeLength) { 
+			if ((CurrentTick()-seesWhiteTime) > barTimeLength) {
+				NumOut(0,LCD_LINE4, seesWhiteTime);
 				/* 
 				 * wenn zu lange weiss war bis er schwarz gesehen hat
 				 * dann wird zurückgesetzt
 				 */
-				t0 = CurrentTick();
 				countBWChanges = 0;
 			}
-			if (countBWChanges == 1 && ((CurrentTick()-t0) < barTimeLength)) { 
+			if ((CurrentTick()-lastWhiteSeen) < MS_200 && countBWChanges == 2 && ((CurrentTick()-seesWhiteTime) < barTimeLength)) { 
 				/* 
 				 * wenn er nach schwarz sehen, innerhalb von ca. 200ms wieder schwarz sieht,
 				 * dann erkennt er den barcode. bedeutet, dass er den barcode aber nur anhand
 				 * eines weissen striches fest macht.
 				 */
 				PlayTone(TONE_C4, 200);
-				t0 = CurrentTick();
+				seesWhiteTime = CurrentTick();
+				lastWhiteSeen = 0;
 				countBWChanges = 0;
 				countTower++;
 				tower();
 			}
+			lastWhiteSeen += CurrentTick();
 		}
 	}
 }
