@@ -5,7 +5,7 @@ bool rightLastBlack;
 bool leftLastBlack;
 int countBWChanges = 0;
 int countTower = 0;
-long towerfail;
+long seeTowerfail, touchTowerfail;
 long lastBWChange = 0;
 
 void calibrateLightSensors() {
@@ -77,18 +77,28 @@ void tower() {
 			break;
 	}
 
-	until (SensorUS(IN_4) < 30) {
+	seeTowerfail = CurrentTick();
+	/*
+	* es wird eingedreht, bis unter 30 cm was gesehen wird und die Zeit
+	* von 800ms nicht überschritten wird
+	*/
+	until (SensorUS(IN_4) < 30 /*(CurrentTick()-seeTowerfail) < SEC_2*/) {
 		PlayTone(TONE_A4, MS_1);
+		PlayTone(TONE_C4, MS_100);
+		NumOut(5, LCD_LINE4, (CurrentTick()-seeTowerfail));
 	}
-	PlayTone(TONE_C4, MS_100);
 	// MS_200 länger eindrehen
 	Wait(MS_200);
 
-	ttowerfail = CurrentTick();
+	touchTowerfail = CurrentTick();
 	TextOut(0, LCD_LINE3, "Moving to tower");
-	speed(30, 30);
-
-	until (Sensor(IN_3));
+	speed(40, 40);
+	/*
+	* Es wird so lange auf den Turm zugefahren, bis der Touchsensor
+	* reagiert oder die Zeit in dem er eigentlich aktiv werden sollte
+	* überschritten wird.
+	*/
+	until (Sensor(IN_3) && (CurrentTick()-touchTowerfail) < SEC_2);
 	Off(OUT_AB);
 	TextOut(0, LCD_LINE4, "Got it!");
 	PlayTone(TONE_A4, MS_100);
@@ -116,10 +126,10 @@ task move() {
 				speed(-30, -35);
 			} else if (leftLastBlack) {
 				lcd("Turning left");
-				speed(-10, 80);
+				speed(-10, 90);
 			} else if (rightLastBlack) {
 				lcd("Turning right");
-				speed(80, -10);
+				speed(90, -10);
 			}
 
 			/* 
@@ -129,9 +139,19 @@ task move() {
 			 */
 			long curveStart = CurrentTick();
 			until (leftSeesBlack || rightSeesBlack) {
-				// if ((curveStart+SEC_1) < CurrentTick() {
-				// 	rightLastBlack
-				// }
+				/*
+				* falls von der Bahn in einer 90 Gradkurve abgekommen,
+				* und es wird nach 1 Sek immer noch nicht schwarz gesehen,
+				* soll in die andere Richtung eingedreht werden, bis mind. ein 
+				* Sensor wieder schwarz sieht.
+				*/
+				if ((CurrentTick()-curveStart > SEC_1) && leftLastBlack){
+					speed(60,-10);
+				}
+				if((CurrentTick()-curveStart > SEC_1) && rightLastBlack){
+					speed(-10,60);
+				}
+
 				leftSeesBlack = (Sensor(IN_1) < thresholdBlack);
 				rightSeesBlack = (Sensor(IN_2) < thresholdBlack);
 			}
