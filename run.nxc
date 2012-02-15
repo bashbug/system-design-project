@@ -3,6 +3,7 @@ bool leftSeesBlack = 0;
 bool rightSeesBlack = 0;
 bool rightLastBlack;
 bool leftLastBlack;
+bool seeTower = 0;
 int countBWChanges = 0;
 int countTower = 0;
 long seeTowerfail, touchTowerfail;
@@ -28,7 +29,7 @@ void calibrateLightSensors() {
 
 void speed(int speedLeft, int speedRight) { // OUT_A=left Motor; OUT_B=right Motor
 	if (speedLeft == speedRight) {
-		OnRevSync(OUT_AB, speedLeft, 0);
+		OnRev(OUT_AB, speedLeft);
 	}
 	OnRev(OUT_A, speedLeft);
 	OnRev(OUT_B, speedRight);
@@ -43,7 +44,7 @@ void backToLine() {
 	// erstmal ein Stück rückwärts fahren
 	lcd("Back to line");
 	speed(-60, -60);
-	Wait(MS_500);
+	Wait(MS_200);
 
 	switch (countTower) {
 		case 1:
@@ -57,7 +58,7 @@ void backToLine() {
 	until ((Sensor(IN_1) < thresholdBlack) || (Sensor(IN_2) < thresholdBlack));
 	lcd("Found line :-)");
 	// Sollte eigentlich überflüssig sein
-	speed(30, 30);	
+	//speed(30, 30);	
 }
 
 void tower() {
@@ -70,38 +71,57 @@ void tower() {
 	switch (countTower) { 
 		case 1:				//erster und dritter ist rechts
 		case 3:
-			speed(30,-30);
+			speed(60,-60);
 			break;
 		case 2:
-			speed(-30,30);
+			speed(-60,60);
 			break;
 	}
 
-	seeTowerfail = CurrentTick();
 	/*
 	* es wird eingedreht, bis unter 30 cm was gesehen wird und die Zeit
 	* von 800ms nicht überschritten wird
 	*/
-	until (SensorUS(IN_4) < 30 /*(CurrentTick()-seeTowerfail) < SEC_2*/) {
+	seeTowerfail = CurrentTick();
+	while (SensorUS(IN_4) >= 30 && (CurrentTick()-seeTowerfail) < MS_900) {
 		PlayTone(TONE_A4, MS_1);
-		PlayTone(TONE_C4, MS_100);
-		NumOut(5, LCD_LINE4, (CurrentTick()-seeTowerfail));
+		seeTower = 1;
 	}
-	// MS_200 länger eindrehen
-	Wait(MS_200);
+	/*
+	* wenn der Ultraschallsensor nichts erkennt, soll wieder 
+	* zur linie eingedreht werden.
+	*/
+	if(seeTower == 0 || (CurrentTick()-seeTowerfail) > MS_900) {
+		backToLine();
+		seeTower = 0;
+		lcd("can't see the fucking tower");
+	}
 
 	touchTowerfail = CurrentTick();
-	TextOut(0, LCD_LINE3, "Moving to tower");
-	speed(40, 40);
 	/*
 	* Es wird so lange auf den Turm zugefahren, bis der Touchsensor
 	* reagiert oder die Zeit in dem er eigentlich aktiv werden sollte
 	* überschritten wird.
 	*/
-	until (Sensor(IN_3) && (CurrentTick()-touchTowerfail) < SEC_2);
-	Off(OUT_AB);
-	TextOut(0, LCD_LINE4, "Got it!");
-	PlayTone(TONE_A4, MS_100);
+	if(seeTower == 1){
+		while (!Sensor(IN_3) && (CurrentTick()-touchTowerfail) < MS_800 && seeTower == 1) {
+			PlayTone(TONE_C4, MS_100);
+			TextOut(0, LCD_LINE3, "Moving to tower");
+			NumOut(0, LCD_LINE4, (CurrentTick()-seeTowerfail));
+			speed(60, 60);
+			TextOut(0, LCD_LINE4, "Got it!");
+			PlayTone(TONE_A4, MS_100);
+		}
+		Off(OUT_AB);
+		/*
+		* wenn der Tochsensor nicht reagiert, dann soll wieder zur
+		* Line zurückgefahren werden.
+		*/
+		if(seeTower == 0 || (CurrentTick()-touchTowerfail) > MS_800) {
+			lcd("can't find the fucking tower");
+			//backToLine();
+		}		
+	}
 	backToLine();
 }
 
@@ -126,10 +146,10 @@ task move() {
 				speed(-30, -35);
 			} else if (leftLastBlack) {
 				lcd("Turning left");
-				speed(-10, 90);
+				speed(-20, 90);
 			} else if (rightLastBlack) {
 				lcd("Turning right");
-				speed(90, -10);
+				speed(90, -20);
 			}
 
 			/* 
@@ -145,11 +165,17 @@ task move() {
 				* soll in die andere Richtung eingedreht werden, bis mind. ein 
 				* Sensor wieder schwarz sieht.
 				*/
-				if ((CurrentTick()-curveStart > SEC_1) && leftLastBlack){
-					speed(60,-10);
+				if ((CurrentTick()-curveStart > SEC_2) && leftLastBlack){
+					speed(-40,40);
+					Wait(200);
+					speed(90,-20);
+					NumOut(5,LCD_LINE4, CurrentTick()-curveStart);
 				}
-				if((CurrentTick()-curveStart > SEC_1) && rightLastBlack){
-					speed(-10,60);
+				if((CurrentTick()-curveStart > SEC_2) && rightLastBlack){
+					speed(-40,40);
+					Wait(200);
+					speed(-20,90);
+					NumOut(5,LCD_LINE4, CurrentTick()-curveStart);
 				}
 
 				leftSeesBlack = (Sensor(IN_1) < thresholdBlack);
