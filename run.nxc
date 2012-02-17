@@ -44,15 +44,15 @@ void backToLine() {
 	// erstmal ein Stück rückwärts fahren
 	lcd("Back to line");
 	speed(-60, -60);
-	Wait(MS_200);
+	Wait(MS_300);
 
 	switch (countTower) {
 		case 1:
 		case 3:
-			speed(-60, 60);
+			speed(-20, 60);
 			break;
 		case 2:
-			speed(60, -60);
+			speed(60, -20);
 			break;
 	}
 	until ((Sensor(IN_1) < thresholdBlack) || (Sensor(IN_2) < thresholdBlack));
@@ -77,7 +77,6 @@ void tower() {
 			speed(-60,60);
 			break;
 	}
-
 	/*
 	* es wird eingedreht, bis unter 30 cm was gesehen wird und die Zeit
 	* von 800ms nicht überschritten wird
@@ -93,6 +92,7 @@ void tower() {
 	*/
 	if(seeTower == 0 || (CurrentTick()-seeTowerfail) > MS_900) {
 		backToLine();
+		countTower = -1;
 		seeTower = 0;
 		lcd("can't see the fucking tower");
 	}
@@ -146,10 +146,10 @@ task move() {
 				speed(-30, -35);
 			} else if (leftLastBlack) {
 				lcd("Turning left");
-				speed(-20, 90);
+				speed(-10, 80);
 			} else if (rightLastBlack) {
 				lcd("Turning right");
-				speed(90, -20);
+				speed(80, -10);
 			}
 
 			/* 
